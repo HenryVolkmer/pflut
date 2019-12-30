@@ -1,5 +1,7 @@
 <?php
 
+declare(ticks=1);
+
 class PflutServer
 {
 	private $_map = [];
@@ -10,6 +12,8 @@ class PflutServer
 	public $y = 0;
 	public $w = 200;
 	public $h = 200;
+	public $bind = '0.0.0.0';
+	public $port = 8000;
 
 	public function __construct()
 	{
@@ -32,6 +36,17 @@ class PflutServer
 			exit("File " . $this->img . " is no image!");
 		}
 
+		$sighandler = function (int $signo,$siginfo) {
+			pcntl_signal_dispatch();
+			echo "close socket - release binding\n";
+			socket_close($this->_socket);
+			exit();
+		};
+
+		
+		pcntl_signal(SIGTERM, $sighandler);
+		pcntl_signal(SIGINT, $sighandler);
+
 		/**
 		 * from left to right, then new line
 		 */
@@ -45,8 +60,8 @@ class PflutServer
 		);
 
 		$cnt = 0;
-		$y = $this->y;
-		$x = $this->x;
+		$y = 0;
+		$x = 0;
 
 		foreach ($map as $color) {
 
@@ -59,7 +74,7 @@ class PflutServer
 
 				if ($x > $this->w) {
 					$y++;
-					$x = $this->x;
+					$x = 0;
 				}
 
 				continue;
@@ -74,22 +89,25 @@ class PflutServer
 
 	public function addToMap($x,$y,$color)
 	{
+		$x += $this->x;
+		$y += $this->y;
 		$this->_map[$x.','.$y][] = $color;
 	}
 
 	public function handle()
 	{
+		
 		$this->_socket = socket_create(AF_INET, SOCK_STREAM, getprotobyname('tcp'));
-		socket_bind($this->_socket, '0.0.0.0',8000);
+		socket_bind($this->_socket, $this->bind,$this->port);
 		socket_listen($this->_socket);
 		socket_set_nonblock($this->_socket);
 
 		$map = json_encode($this->_map) . "\n";
 
-		echo "Waiting connections\n";
+		echo "Waiting for connections on {$this->bind}:{$this->port}\n";
 		while (true) {
 
-			usleep(500);
+			usleep(200);
 
 			$client_socket = socket_accept($this->_socket);
 
@@ -104,4 +122,4 @@ class PflutServer
 
 }
 
-(new PflutServer());
+new PflutServer();
