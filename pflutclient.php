@@ -9,7 +9,7 @@ class PflutClient
 
 	public $target = '151.217.111.34';
 	public $port = 1234;
-	public $maxthreads = 1;
+	public $maxthreads = 10;
 
 	public $isThread = false;
 
@@ -21,8 +21,6 @@ class PflutClient
 	public function __construct()
 	{
 		$sighandler = function (int $signo,$siginfo) {
-
-			echo $signo;
 
 			if ($this->isThread) {
 				exit();
@@ -115,12 +113,15 @@ class PflutClient
 		$host = explode(":", $host);
 		$port = (isset($host[1]) ? $host[1] : 8000);
 
-		$this->log("connect socket\n");
+		$this->log("connect socket {$host[0]}:{$port}\n");
 
-		socket_connect($socket, $host[0],$port);
+		if (!socket_connect($socket, $host[0],$port)) {
+			$this->log(socket_strerror(socket_last_error()));
+			return;
+		}
 
 		$map = '';
-		while ($response = socket_read($socket,1000,PHP_NORMAL_READ)) {
+		while ($response = @socket_read($socket,1000,PHP_NORMAL_READ)) {
 			$map .= $response;
 		}
 
@@ -172,7 +173,7 @@ class PflutClient
 			$cords = explode(",",$cords);
 
 			$payload = sprintf(
-				"PX %d %d %02x%02x%02x\n",
+				'PX %d %d %02x%02x%02x\n',
 				$cords[0],
 				$cords[1],
 				$color[0], 
@@ -180,7 +181,7 @@ class PflutClient
 				$color[2], 
 			);
 
-			$this->log($payload);
+			$this->log(getmypid() . ' | ' . $payload);
 
 			socket_send($socket,$payload,strlen($payload),MSG_DONTROUTE);
 		}
